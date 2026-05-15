@@ -36,7 +36,6 @@ const handleApiResponse = async (response: Response) => {
 
   let errorMessage = 'An unexpected error occurred. Please try again.';
 
-  // Map known status codes to user-friendly messages
   switch (response.status) {
     case 400: // Bad Request
       errorMessage = backendMessage || 'Invalid input. Please check your email, username, and password format.';
