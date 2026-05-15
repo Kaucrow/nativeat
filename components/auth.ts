@@ -1,3 +1,4 @@
+import { LoginFormData, RegisterFormData } from '@/types/auth';
 import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
@@ -16,42 +17,97 @@ GoogleSignin.configure({
   forceCodeForRefreshToken: true,
 });
 
-export const handleEmailAuth = async (data: any, isRegister: boolean) => {
-  const endpoint = isRegister ? '/user/register' : '/auth/local/login';
+const handleApiResponse = async (response: Response) => {
+  if (response.ok) {
+    return { success: true };
+  }
 
-  const payload = isRegister 
-    ? { 
+  let backendMessage = '';
+  const contentType = response.headers.get("content-type");
+
+  if (contentType && contentType.includes("application/json")) {
+    try {
+      const errorData = await response.json();
+      backendMessage = errorData.message || errorData.error || '';
+    } catch (e) {
+      console.error("Failed to parse error JSON", e);
+    }
+  }
+
+  let errorMessage = 'An unexpected error occurred. Please try again.';
+
+  // Map known status codes to user-friendly messages
+  switch (response.status) {
+    case 400: // Bad Request
+      errorMessage = backendMessage || 'Invalid input. Please check your email, username, and password format.';
+      break;
+    case 401: // Unauthorized
+      errorMessage = backendMessage || 'Invalid email/username or password. If you just registered, please verify your email first.';
+      break;
+    case 409: // Conflict
+      errorMessage = backendMessage || 'This email or username is already in use.';
+      break;
+    case 500: // Server Error
+      errorMessage = 'Server error. Please try again later.';
+      break;
+    default:
+      if (backendMessage) {
+        errorMessage = backendMessage;
+      } else {
+        const errorText = await response.text();
+        console.error(`Server raw error (${response.status}):`, errorText);
+        errorMessage = `Technical difficulties (Error ${response.status}).`;
+      }
+  }
+
+  return { success: false, error: errorMessage };
+};
+
+export const registerUser = async (data: RegisterFormData) => {
+  try {
+    const response = await fetch(`${BACKEND_URL}/user/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         email: data.email,
         username: data.username,
         password: data.password
-      }
-    : {
-        identity: data.email,
-        password: data.password
-      };
+      }),
+    });
+    return await handleApiResponse(response);
+  } catch (err) {
+    console.error("Registration Network Error:", err);
+    return { success: false, error: "Network error. Please check your connection and try again." };
+  }
+};
 
+export const loginUser = async (data: LoginFormData) => {
   try {
-    const response = await fetch(`${BACKEND_URL}${endpoint}`, {
+    const response = await fetch(`${BACKEND_URL}/auth/local/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload), // Send the correctly keyed object
+      body: JSON.stringify({
+        identity: data.email, 
+        password: data.password
+      }),
     });
-
-    const contentType = response.headers.get("content-type");
-
-    if (response.ok) {
-      return { success: true };
-    } else if (contentType && contentType.includes("application/json")) {
-      const errorData = await response.json();
-      return { success: false, error: errorData.message || 'Auth failed' };
-    } else {
-      // Handles cases where the server returns a raw string or HTML error
-      const errorText = await response.text();
-      console.error("Server raw error:", errorText);
-      return { success: false, error: `Error ${response.status}: Technical difficulties.` };
-    }
+    return await handleApiResponse(response);
   } catch (err) {
-    console.error("Email Auth Network Error:", err);
+    console.error("Login Network Error:", err);
+    return { success: false, error: "Network error. Please check your connection and try again." };
+  }
+};
+
+export const verifyUserToken = async (token: string) => {
+  try {
+    const response = await fetch(`${BACKEND_URL}/user/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    return await handleApiResponse(response);
+  } catch (err) {
+    console.error("Verification Network Error:", err);
     return { success: false, error: "Network error. Please try again." };
   }
 };
@@ -67,14 +123,10 @@ const sendCodeToBackend = async (code: string, provider: 'Google' | 'GitHub') =>
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code }),
     });
-
-    if (res.ok) {
-      return { success: true };
-    } else {
-      const errorData = await res.json();
-      return { success: false, error: errorData.message || `${provider} auth failed` };
-    }
+    // Reusing our upgraded handler here for consistency!
+    return await handleApiResponse(res);
   } catch (err) {
+    console.error(`Social login network error (${provider}):`, err);
     return { success: false, error: "Network error during social login." };
   }
 };

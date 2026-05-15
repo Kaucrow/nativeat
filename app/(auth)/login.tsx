@@ -1,8 +1,9 @@
-import { handleEmailAuth, handleNativeSocialAuth } from '@/components/auth';
+import { handleNativeSocialAuth, loginUser, registerUser } from '@/components/auth';
 import { LoginForm } from '@/components/ui/auth/login-form';
 import { RegisterForm } from '@/components/ui/auth/register-form';
 import { SocialAuth } from '@/components/ui/auth/social-auth';
 import { useAppTheme } from '@/context/theme-context';
+import { LoginFormData, RegisterFormData } from '@/types/auth';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -21,21 +22,36 @@ export default function LoginScreen() {
   const [loadingProvider, setLoadingProvider] = useState<'Google' | 'GitHub' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const onEmailSubmit = async (data: any) => {
+  const onLoginSubmit = async (data: LoginFormData) => {
     setLoading(true);
-    setError(null); // Clear any previous errors
+    setError(null);
 
-    const result = await handleEmailAuth(data, isRegister);
+    const result = await loginUser(data);
 
     if (result.success) {
       await SecureStore.setItemAsync('has_valid_session', 'true');
       router.replace('/'); 
     } else {
-      setError(result.error || 'Authentication failed. Please try again.');
+      setError(result.error || 'Login failed. Please try again.');
     }
 
     setLoading(false);
-  }
+  };
+
+  const onRegisterSubmit = async (data: RegisterFormData) => {
+    setLoading(true);
+    setError(null);
+
+    const result = await registerUser(data);
+
+    if (result.success) {
+      router.replace('/verify-pending');
+    } else {
+      setError(result.error || 'Registration failed. Please try again.');
+    }
+
+    setLoading(false);
+  };
 
   const onSocialSubmit = async (provider: 'Google' | 'GitHub') => {
     setLoadingProvider(provider);
@@ -97,7 +113,7 @@ export default function LoginScreen() {
               entering={FadeIn.delay(100).duration(300)}
             >
               <RegisterForm
-                onSubmit={onEmailSubmit}
+                onSubmit={onRegisterSubmit}
                 loading={loading}
                 errorMessage={error}
               />
@@ -108,7 +124,7 @@ export default function LoginScreen() {
               entering={FadeIn.delay(100).duration(300)}
             >
               <LoginForm
-                onSubmit={onEmailSubmit}
+                onSubmit={onLoginSubmit}
                 loading={loading}
                 errorMessage={error}
               />
