@@ -2,7 +2,8 @@ import { Redirect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { ActivityIndicator, Text, useTheme } from 'react-native-paper';
+import { ActivityIndicator, useTheme } from 'react-native-paper';
+import Home from './home';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
@@ -17,7 +18,6 @@ export default function Index() {
 
         if (localSession === 'true') {
           setIsAuthenticated(true);
-
           return;
         }
 
@@ -51,11 +51,5 @@ export default function Index() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
-      <Text variant="headlineMedium" style={{ color: theme.colors.primary }}>
-        Welcome to NativEat! :D
-      </Text>
-    </View>
-  );
+  return <Home />;
 }
